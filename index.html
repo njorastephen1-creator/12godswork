@@ -79,7 +79,7 @@
     .toggle-switch.active { background: #43e97b; }
     .toggle-switch::after { content: ''; position: absolute; width: 22px; height: 22px; background: white; border-radius: 50%; top: 3px; left: 3px; transition: all 0.3s ease; }
     .toggle-switch.active::after { left: calc(100% - 25px); }
-    .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 28px; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; }
+    .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 28px; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
     .btn-secondary { background: white; color: #667eea; border: 2px solid #667eea; padding: 12px 28px; border-radius: 12px; font-weight: 700; cursor: pointer; }
     .btn-success { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 12px 28px; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; }
     .btn-danger { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; }
@@ -162,6 +162,9 @@
       <div class="user-controls">
         <a href="https://njorastephen1-creator.github.io/school-/" target="_blank" class="exam-portal-link">
           <i class="fas fa-graduation-cap"></i> Exam Portal
+        </a>
+        <a href="certificate-generator.html" class="btn-primary" style="padding:8px 16px;">
+          <i class="fas fa-certificate"></i> Certificates
         </a>
         <button id="install-app-btn" class="btn-success" style="padding:8px 16px;display:none;" onclick="installApp()">
           <i class="fas fa-download"></i> Install App
@@ -384,8 +387,17 @@
     <div class="modal-content">
       <span class="close-modal" onclick="document.getElementById('bulk-message-modal').classList.remove('active')">&times;</span>
       <h3 style="margin-bottom:16px;color:#4a5568;">Send Bulk Message</h3>
+      
+      <div style="margin-bottom:16px;">
+        <label style="display:block;margin-bottom:8px;font-weight:600;color:#4a5568;font-size:14px;">Search Students</label>
+        <input type="text" id="bulk-message-search" placeholder="Type student name or phone..." 
+          style="width:100%;padding:10px 14px;border:2px solid #e2e8f0;border-radius:8px;font-size:15px;" 
+          oninput="filterBulkMessageStudents()">
+      </div>
+      
       <p style="margin-bottom:12px;font-size:14px;color:#64748b;">Select students to message:</p>
       <div id="bulk-student-list" style="max-height:200px;overflow-y:auto;margin-bottom:16px;border:1px solid #e2e8f0;border-radius:8px;padding:8px;"></div>
+      
       <div class="form-row" style="margin-bottom:12px;">
         <div class="form-group">
           <label>Message Method</label>
@@ -404,10 +416,12 @@
           </select>
         </div>
       </div>
+      
       <div class="form-group">
         <label>Message</label>
         <textarea id="bulk-message-text" placeholder="Type your message..." style="width:100%;padding:12px;border:2px solid #e2e8f0;border-radius:12px;margin-bottom:16px;min-height:100px;"></textarea>
       </div>
+      
       <button class="btn-success" onclick="sendBulkMessage()" style="width:100%;"><i class="fas fa-paper-plane"></i> Send Message</button>
     </div>
   </div>
@@ -569,45 +583,6 @@
         .then(uc => database.ref('pending_users/' + uc.user.uid).set({ email, name, role, requestedAt: firebase.database.ServerValue.TIMESTAMP, status: 'pending' }))
         .then(() => { alert('Request submitted!'); closeRegisterModal(); auth.signOut(); })
         .catch(err => alert('Error: ' + err.message));
-    };
-        function loadUserManagement() {
-      const pendingList = document.getElementById('pending-users-list');
-      const authorizedList = document.getElementById('authorized-users-list');
-      database.ref('pending_users').on('value', snapshot => {
-        const users = snapshot.val() || {};
-        pendingList.innerHTML = Object.keys(users).length === 0 ? '<p style="color:#64748b;padding:20px;text-align:center;">No pending requests</p>' :
-          Object.entries(users).map(([uid, u]) => '<div class="user-item pending"><div><strong>' + u.name + '</strong><br><small>' + u.email + '</small></div><div class="user-actions"><button class="btn-success btn-sm" onclick="approveUser(\'' + uid + '\',\'' + u.email + '\')">Approve</button><button class="btn-danger btn-sm" onclick="rejectUser(\'' + uid + '\')">Reject</button></div></div>').join('');
-      });
-      database.ref('authorized_users').on('value', snapshot => {
-        const users = snapshot.val() || {};
-        authorizedList.innerHTML = Object.keys(users).length === 0 ? '<p style="color:#64748b;padding:20px;text-align:center;">No authorized users</p>' :
-          Object.entries(users).map(([uid, u]) => '<div class="user-item approved"><div><strong>' + u.name + '</strong><br><small>' + u.email + '</small></div><div class="user-actions">' + (uid!==app.currentUser.uid?'<button class="btn-danger btn-sm" onclick="removeUser(\'' + uid + '\',\'' + u.email + '\')">Remove</button>':'<small>(You)</small>') + '</div></div>').join('');
-      });
-    }
-
-    window.approveUser = function(uid, email) {
-      if (!checkAdminAccess()) return;
-      database.ref('pending_users/' + uid).once('value').then(s => database.ref('authorized_users/' + uid).set({...s.val(), approvedAt: firebase.database.ServerValue.TIMESTAMP, status: 'approved'}))
-        .then(() => database.ref('pending_users/' + uid).remove()).then(() => alert('Approved!'));
-    };
-    window.rejectUser = function(uid) {
-      if (!checkAdminAccess()) return;
-      database.ref('pending_users/' + uid).remove().then(() => alert('Rejected'));
-    };
-    window.removeUser = function(uid, email) {
-      if (!checkAdminAccess()) return;
-      if (uid === app.currentUser.uid) { alert('Cannot remove yourself!'); return; }
-      database.ref('authorized_users/' + uid).remove().then(() => alert('Removed'));
-    };
-    window.addNewUser = function(e) {
-      e.preventDefault();
-      if (!checkAdminAccess()) return;
-      const email = document.getElementById('new-user-email').value.trim();
-      const password = document.getElementById('new-user-password').value;
-      const name = document.getElementById('new-user-name').value.trim();
-      auth.createUserWithEmailAndPassword(email, password)
-        .then(uc => database.ref('authorized_users/' + uc.user.uid).set({ email, name, role: 'User', createdAt: firebase.database.ServerValue.TIMESTAMP, status: 'approved' }))
-        .then(() => { alert('User created!'); e.target.reset(); }).catch(err => alert('Error: ' + err.message));
     };
         function loadUserManagement() {
       const pendingList = document.getElementById('pending-users-list');
@@ -1141,13 +1116,35 @@
     };
 
     window.openBulkMessageModal = function() {
+      window.originalBulkStudents = [...app.filteredStudents];
+      filterBulkMessageStudents();
+      document.getElementById('bulk-message-modal').classList.add('active');
+    };
+
+    window.filterBulkMessageStudents = function() {
+      const searchTerm = (document.getElementById('bulk-message-search').value || '').trim().toLowerCase();
       const list = document.getElementById('bulk-student-list');
-      list.innerHTML = '<label style="display:block;padding:8px 0;margin-bottom:8px;"><input type="checkbox" id="bulk-select-all" onchange="toggleBulkSelectAll()"/> <strong>Select All</strong></label>' + 
-        app.filteredStudents.map(id => {
+      
+      let studentsToShow = window.originalBulkStudents || app.filteredStudents;
+      
+      if (searchTerm) {
+        studentsToShow = studentsToShow.filter(id => {
+          const s = app.students[id];
+          return (s.name && s.name.toLowerCase().includes(searchTerm)) ||
+                 (s.phone && s.phone.toString().includes(searchTerm));
+        });
+      }
+      
+      if (studentsToShow.length === 0) {
+        list.innerHTML = '<p style="padding:20px;text-align:center;color:#64748b;">No students found</p>';
+        return;
+      }
+      
+      list.innerHTML = '<label style="display:block;padding:8px 0;margin-bottom:8px;"><input type="checkbox" id="bulk-select-all" onchange="toggleBulkSelectAll()"/> <strong>Select All (' + studentsToShow.length + ')</strong></label>' + 
+        studentsToShow.map(id => {
           const s = app.students[id];
           return '<label style="display:block;padding:8px 0;"><input type="checkbox" value="' + id + '" class="bulk-select"/> ' + s.name + ' (Class ' + s.class + ')</label>';
         }).join('');
-      document.getElementById('bulk-message-modal').classList.add('active');
     };
 
     window.toggleBulkSelectAll = function() {
@@ -1220,7 +1217,7 @@
 
     window.installApp = async function() {
       if (!deferredPrompt) {
-        alert('Install prompt not available. Try again later.');
+        alert('Install not available right now. Make sure you are on HTTPS and using Chrome/Edge.');
         return;
       }
       
@@ -1230,11 +1227,11 @@
       console.log('User choice:', outcome);
       
       if (outcome === 'accepted') {
-        console.log('User accepted the install prompt');
+        console.log('User accepted install');
         if (installBtn) {
           installBtn.style.display = 'none';
         }
-        alert('App installed successfully! You can now access it from your home screen.');
+        alert('App installed successfully!');
       }
       
       deferredPrompt = null;
@@ -1250,29 +1247,25 @@
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function() {
-        navigator.serviceWorker.register('data:text/javascript,' + encodeURIComponent(`
-          self.addEventListener('install', function(e) {
-            console.log('[Service Worker] Install');
-            self.skipWaiting();
+        navigator.serviceWorker.register('./sw.js')
+          .then(registration => {
+            console.log('Service Worker registered:', registration.scope);
+            
+            registration.addEventListener('updatefound', () => {
+              const newWorker = registration.installing;
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  console.log('New content available, refresh to update');
+                  if (confirm('New version available! Refresh to update?')) {
+                    window.location.reload();
+                  }
+                }
+              });
+            });
+          })
+          .catch(error => {
+            console.log('Service Worker registration failed:', error);
           });
-          
-          self.addEventListener('activate', function(e) {
-            console.log('[Service Worker] Activate');
-            return self.clients.claim();
-          });
-          
-          self.addEventListener('fetch', function(e) {
-            e.respondWith(
-              fetch(e.request).catch(function() {
-                return caches.match(e.request);
-              })
-            );
-          });
-        `)).then(registration => {
-          console.log('Service Worker registered:', registration.scope);
-        }).catch(error => {
-          console.log('Service Worker registration failed:', error);
-        });
       });
     }
 
